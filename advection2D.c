@@ -32,9 +32,9 @@ int main(){
   const int NX=1000;    // Number of x points
   const int NY=1000;    // Number of y points
   const float xmin=0.0; // Minimum x value
-  const float xmax=1.0; // Maximum x value
+  const float xmax=30.0; // Maximum x value
   const float ymin=0.0; // Minimum y value
-  const float ymax=1.0; // Maximum y value
+  const float ymax=30.0; // Maximum y value
   
   /* Parameters for the Gaussian initial conditions */
   const float x0=0.1;                    // Centre(x)
@@ -88,21 +88,23 @@ int main(){
 
   /*** Place x points in the middle of the cell ***/
   /* LOOP 1 */
-  # pragma omp parallel for 
+  /*#pragma omp parallel for default(none) private(i) shared(NX,dx,x)*/
   for (int i=0; i<NX+2; i++){
     x[i] = ( (float) i - 0.5) * dx;
   }
 
   /*** Place y points in the middle of the cell ***/
   /* LOOP 2 */
-  # pragma omp parallel for
+  /*#pragma omp parallel for default(none) private(j) shared(NY,dy,y)*/
   for (int j=0; j<NY+2; j++){
     y[j] = ( (float) j - 0.5) * dy;
   }
 
   /*** Set up Gaussian initial conditions ***/
   /* LOOP 3 */
-  # pragma omp parallel for collapse(2)
+  int i;
+  int j;
+  #pragma omp parallel for default(none) private(i,j) shared(u,x,NX,x0,y,NY,y0,sigmax2,sigmay2) collapse(2) lastprivate(x2,y2)
   for (int i=0; i<NX+2; i++){
     for (int j=0; j<NY+2; j++){
       x2      = (x[i]-x0) * (x[i]-x0);
@@ -115,7 +117,7 @@ int main(){
   FILE *initialfile;
   initialfile = fopen("initial.dat", "w");
   /* LOOP 4 */
-  # pragma omp parallel for collapse(2)
+  /*#pragma omp parallel for default(none) private(i,j) shared(u,x,NX,y,NY,initialfile) collapse(2)*/
   for (int i=0; i<NX+2; i++){
     for (int j=0; j<NY+2; j++){
       fprintf(initialfile, "%g %g %g\n", x[i], y[j], u[i][j]);
@@ -125,12 +127,11 @@ int main(){
   
   /*** Update solution by looping over time steps ***/
   /* LOOP 5 */
-  # pragma omp parallel for
+  /* #pragma omp parallel for default(none) private(m) shared(u,nsteps,NX,y,NY,dudt,bval_left,bval_right,bval_lower,bval_upper,velx,dx,vely,dy,dt) */
   for (int m=0; m<nsteps; m++){
     
     /*** Apply boundary conditions at u[0][:] and u[NX+1][:] ***/
     /* LOOP 6 */
-    # pragma omp parallel for
     for (int j=0; j<NY+2; j++){
       u[0][j]    = bval_left;
       u[NX+1][j] = bval_right;
@@ -138,7 +139,6 @@ int main(){
 
     /*** Apply boundary conditions at u[:][0] and u[:][NY+1] ***/
     /* LOOP 7 */
-    # pragma omp parallel for
     for (int i=0; i<NX+2; i++){
       u[i][0]    = bval_lower;
       u[i][NY+1] = bval_upper;
@@ -147,7 +147,6 @@ int main(){
     /*** Calculate rate of change of u using leftward difference ***/
     /* Loop over points in the domain but not boundary values */
     /* LOOP 8 */
-    # pragma omp parallel for collapse(2)
     for (int i=1; i<NX+1; i++){
       for (int j=1; j<NY+1; j++){
 	dudt[i][j] = -velx * (u[i][j] - u[i-1][j]) / dx
@@ -158,7 +157,6 @@ int main(){
     /*** Update u from t to t+dt ***/
     /* Loop over points in the domain but not boundary values */
     /* LOOP 9 */
-    # pragma omp parallel for collapse(2)
     for	(int i=1; i<NX+1; i++){
       for (int j=1; j<NY+1; j++){
 	u[i][j] = u[i][j] + dudt[i][j] * dt;
@@ -171,7 +169,6 @@ int main(){
   FILE *finalfile;
   finalfile = fopen("final.dat", "w");
   /* LOOP 10 */
-  # pragma omp parallel for collapse(2)
   for (int i=0; i<NX+2; i++){
     for (int j=0; j<NY+2; j++){
       fprintf(finalfile, "%g %g %g\n", x[i], y[j], u[i][j]);

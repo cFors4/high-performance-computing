@@ -1,0 +1,2 @@
+gcc -o advection2D -std=c99 advection2D.c -lm
+gcc -o advection2D -fopenmp -std=c99 advection2D.c -lm

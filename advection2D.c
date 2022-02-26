@@ -74,7 +74,8 @@ int main(){
   
   /* Calculate time step using the CFL condition */
   /* The fabs function gives the absolute value in case the velocity is -ve */
-  float dt = CFL / ( (fabs(velx) / dx) + (fabs(vely) / dy) );
+  float dt = (CFL / ((fabs((0.2/0.41)*log(ymax/1.0)) / dx) + (fabs(vely) / dy)));
+  // float dt = CFL / ( (fabs(velx) / dx) + (fabs(vely) / dy) );
   
   /*** Report information about the calculation ***/
   printf("Grid spacing dx     = %g\n", dx);
@@ -114,6 +115,7 @@ int main(){
   }
 
   /*** Write array of initial u values out to file ***/
+  /* Writing to a file that needs to be plotted, needs to be written in chronological order which parrellelism disrupts */
   FILE *initialfile;
   initialfile = fopen("initial.dat", "w");
   /* LOOP 4 */
@@ -126,6 +128,7 @@ int main(){
   
   /*** Update solution by looping over time steps ***/
   /* LOOP 5 */
+  /* Time steps need to happen in a linear order which making them parallel would and does disrupt */
   for (int m=0; m<nsteps; m++){
     /*** Apply boundary conditions at u[0][:] and u[NX+1][:] ***/
     /* LOOP 6 */
@@ -146,16 +149,16 @@ int main(){
     /*** Calculate rate of change of u using leftward difference ***/
     /* Loop over points in the domain but not boundary values */
     /* LOOP 8 */
-    float velxNew;
-    #pragma omp parallel for default(none) private(i,j,velxNew) shared(NY,dudt,u,NX,velx,vely,dx,dy) collapse(2)
+    float Vx;
+    #pragma omp parallel for default(none) private(i,j,Vx) shared(NY,dudt,u,NX,velx,vely,dx,dy) collapse(2)
     for (int i=1; i<NX+1; i++){
       for (int j=1; j<NY+1; j++){
         int y;
         y = j*dy;
         if (y>1) {
-          velxNew = (0.2/0.41)*log(y/1.0);
-          /*printf("Vx= %g y= %d\n",velxNew,y);*/
-          dudt[i][j] = -1*(velxNew * (u[i][j] - u[i-1][j]) /dx + vely * (u[i][j] - u[i][j-1]) / dy);
+          Vx = (0.2/0.41)*logf(y/1.0);
+          /*printf("Vx= %g y= %d\n",Vx,y);*/
+          dudt[i][j] = -1*(Vx * (u[i][j] - u[i-1][j]) /dx + vely * (u[i][j] - u[i][j-1]) / dy);
         }else{
           dudt[i][j] = -1* (0 * (u[i][j] - u[i-1][j]) / dx + vely * (u[i][j] - u[i][j-1]) / dy);
         }
@@ -177,13 +180,33 @@ int main(){
   FILE *finalfile;
   finalfile = fopen("final.dat", "w");
   /* LOOP 10 */
-  /*#pragma omp parallel for default(none) private(i,j) shared(u,x,y,NX,NY,finalfile) collapse(2)*/
+   /* Writing to a file that needs to be plotted, needs to be written in chronological order which parrellelism disrupts */
   for (int i=0; i<NX+2; i++){
     for (int j=0; j<NY+2; j++){
+      // printf("y= %f\n",u[i][j]);
       fprintf(finalfile, "%g %g %g\n", x[i], y[j], u[i][j]);
     }
   }
   fclose(finalfile);
+  
+  /*** Write array of x values and vertically averaged values of u ***/
+  FILE *averagefile;
+  averagefile = fopen("average.dat", "w");
+  /* LOOP 11 */
+  /* Writing to a file that needs to be plotted, needs to be written in chronological order which parrellelism disrupts */
+  float movingSum;
+  
+  /* Loop through the x's */ 
+  for (int i=0; i<NX+2; i++){
+    movingSum = 0;
+    /* Sum y's to get vertial sum*/ 
+    for (int j=0; j<NY+2; j++){
+      movingSum += u[i][j];
+    }
+    float yAvg = movingSum/NY;
+    fprintf(averagefile, "%g %g\n", x[i], yAvg);
+  }
+  fclose(averagefile);
 
   return 0;
 }

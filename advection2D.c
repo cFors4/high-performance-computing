@@ -2,7 +2,6 @@
 2D advection example program which advects a Gaussian u(x,y) at a fixed velocity
 
 
-
 Outputs: initial.dat - inital values of u(x,y) 
          final.dat   - final values of u(x,y)
 
@@ -74,8 +73,8 @@ int main(){
   
   /* Calculate time step using the CFL condition */
   /* The fabs function gives the absolute value in case the velocity is -ve */
+  /* float dt = CFL / ( (fabs(velx) / dx) + (fabs(vely) / dy) ); */
   float dt = (CFL / ((fabs((0.2/0.41)*log(ymax/1.0)) / dx) + (fabs(vely) / dy)));
-  // float dt = CFL / ( (fabs(velx) / dx) + (fabs(vely) / dy) );
   
   /*** Report information about the calculation ***/
   printf("Grid spacing dx     = %g\n", dx);
@@ -153,7 +152,7 @@ int main(){
     #pragma omp parallel for default(none) private(i,j,Vx) shared(NY,dudt,u,NX,velx,vely,dx,dy) collapse(2)
     for (int i=1; i<NX+1; i++){
       for (int j=1; j<NY+1; j++){
-        int y;
+        float y;
         y = j*dy;
         if (y>1) {
           Vx = (0.2/0.41)*logf(y/1.0);
